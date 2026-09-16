@@ -5,6 +5,7 @@
 Installer task
 
 npm install -g @go-task/cli
+
 brew install go-task
 
 Faire un npm i
