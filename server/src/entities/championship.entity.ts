@@ -1,4 +1,6 @@
-import { Entity, PrimaryGeneratedColumn, Column } from 'typeorm';
+import { Entity, PrimaryGeneratedColumn, Column, OneToMany } from 'typeorm';
+import type { Relation } from 'typeorm';
+import { Season } from './season.entity.js';
 
 @Entity('championships')
 export class Championship {
@@ -10,4 +12,7 @@ export class Championship {
 
   @Column()
   region: string;
+
+  @OneToMany(() => Season, season => season.championship)
+  seasons: Relation<Season>[];
 }
