@@ -1,0 +1,71 @@
+version: '3'
+
+# Définition de variables réutilisables
+vars:
+  DOCKER_DEV: docker-compose.yml
+  DOCKER_PROD: docker-compose.prod.yml
+
+tasks:
+  # Tâche par défaut quand on tape juste 'task'
+  default:
+    cmds:
+      - task -l
+    silent: true
+
+  # --- DOCKER ---
+  up:
+    desc: Lance l'environnement de développement complet (détaché)
+    cmd: docker compose up -d
+
+  down:
+    desc: Coupe l'environnement de développement
+    cmd: docker compose down
+
+  logs:
+    desc: Affiche les logs de tous les conteneurs (task logs) ou d'un seul (task logs -- server)
+    cmd: docker compose logs -f {{.CLI_ARGS}}
+
+  # --- SERVEUR (NestJS) ---
+  server:lint:
+    desc: Vérifie le formatage et les erreurs TS côté NestJS
+    dir: server
+    cmd: npm run lint
+
+  server:install:
+    desc: Installe les dépendances du serveur
+    dir: server
+    cmd: npm install
+
+  # --- SCRAPER (Python) ---
+  scraper:lint:
+    desc: Vérifie le formatage du code Python
+    cmd: docker exec tcr_scraper_dev sh -c "black --check . && flake8 ."
+
+  scraper:format:
+    desc: Formate automatiquement le code Python avec Black
+    cmd: docker exec tcr_scraper_dev black .
+
+  # --- GLOBAL (CI & Hooks) ---
+  check:
+    desc: Lance toutes les vérifications (à utiliser en pre-push par exemple)
+    # Exécute ces tâches en parallèle avant de réussir
+    deps: [server:lint, scraper:lint]
+    cmds:
+      - echo "✅ Toutes les vérifications sont passées avec succès !"
+
+  # --- BASE DE DONNÉES (TypeORM) ---
+  db:generate:
+    desc: Génère un fichier de migration TypeORM (compare le code TS et la BDD)
+    cmd: docker exec -it tcr_server_dev npm run migration:generate
+
+  db:migrate:
+    desc: Applique les migrations en attente sur la base de données PostgreSQL
+    cmd: docker exec -it tcr_server_dev npm run migration:run
+
+  db:dump:
+    desc: Exporte la base de données (structure et données) dans un fichier SQL
+    cmd: mkdir -p dumps && docker exec -t tcr_db_dev pg_dump -U tcr_admin -c tcr_database > dumps/latest_dump.sql
+
+  db:restore:
+    desc: Restaure la base de données avec le dernier dump
+    cmd: docker exec -i tcr_db_dev psql -U tcr_admin -d tcr_database < dumps/latest_dump.sql

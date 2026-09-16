@@ -1,0 +1,33 @@
+services:
+  postgres:
+    image: postgres:16
+    container_name: tcr_db_prod
+    restart: always
+    env_file: .env # En prod, ce fichier sera généré par GitHub Actions
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    # PAS de ports exposés (5432), la DB est invisible de l'extérieur
+    # PAS de pgadmin en production (trop risqué)
+
+  server:
+    build: 
+      context: ./server
+      target: production
+    container_name: tcr_server_prod
+    restart: always
+    env_file: .env
+    ports:
+      - "3000:3000"
+    depends_on:
+      - postgres
+
+  scraper:
+    build:
+      context: ./scraper
+    container_name: tcr_scraper_prod
+    env_file: .env
+    # En prod, le scraper pourrait être lancé via une tâche Cron
+    command: python main.py 
+
+volumes:
+  postgres_data:

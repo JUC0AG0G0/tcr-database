@@ -1,0 +1,5 @@
+Se connecter en SSH à ton serveur.
+
+Créer un fichier .env sur le serveur à la volée en injectant les secrets GitHub.
+
+Lancer la commande docker compose -f docker-compose.prod.yml up -d.

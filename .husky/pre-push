@@ -1,0 +1,8 @@
+#!/usr/bin/env sh
+. "$(dirname -- "$0")/_/husky.sh"
+
+# Lance directement la tâche définie dans ton Taskfile.yml
+task check
+
+# Lancer les test
+#task test
