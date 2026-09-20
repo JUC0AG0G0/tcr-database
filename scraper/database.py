@@ -46,29 +46,50 @@ def get_or_create_car(conn, brand, model):
     return new_id
 
 # --- ARBORESCENCE ---
-def get_or_create_hierarchy(conn):
-    """Crée l'arborescence (WTCR > 2018 > Maroc > Course 1) et renvoie l'ID de la Session"""
+# --- ARBORESCENCE ---
+def get_or_create_hierarchy(conn, champ_name, year, event_name, circuit, start_date=None, end_date=None, session_name="Race 1", session_type="RACE", session_date=None):
+    """Crée l'arborescence dynamique et met à jour les dates si elles sont fournies."""
     cursor = conn.cursor()
     
     # 1. Championnat
-    cursor.execute("SELECT id FROM championships WHERE name = 'WTCR'")
+    cursor.execute('SELECT id FROM championships WHERE name = %s', (champ_name,))
     res = cursor.fetchone()
-    champ_id = res[0] if res else cursor.execute("INSERT INTO championships (name, region) VALUES ('WTCR', 'Global') RETURNING id") or cursor.fetchone()[0]
+    champ_id = res[0] if res else cursor.execute("INSERT INTO championships (name, region) VALUES (%s, 'Global') RETURNING id", (champ_name,)) or cursor.fetchone()[0]
     
     # 2. Saison
-    cursor.execute('SELECT id FROM seasons WHERE year = 2018 AND "championshipId" = %s', (champ_id,))
+    cursor.execute('SELECT id FROM seasons WHERE year = %s AND "championshipId" = %s', (year, champ_id))
     res = cursor.fetchone()
-    season_id = res[0] if res else cursor.execute('INSERT INTO seasons (year, "championshipId") VALUES (2018, %s) RETURNING id', (champ_id,)) or cursor.fetchone()[0]
+    season_id = res[0] if res else cursor.execute('INSERT INTO seasons (year, "championshipId") VALUES (%s, %s) RETURNING id', (year, champ_id)) or cursor.fetchone()[0]
     
     # 3. Événement
-    cursor.execute('SELECT id FROM events WHERE name = %s AND "seasonId" = %s', ('Race of Morocco', season_id))
+    cursor.execute('SELECT id FROM events WHERE name = %s AND "seasonId" = %s', (event_name, season_id))
     res = cursor.fetchone()
-    event_id = res[0] if res else cursor.execute('INSERT INTO events (name, circuit, "seasonId") VALUES (%s, %s, %s) RETURNING id', ('Race of Morocco', 'Circuit Moulay el Hassan', season_id)) or cursor.fetchone()[0]
+    if res:
+        event_id = res[0]
+        # Si l'événement existe mais qu'on a de nouvelles dates, on met à jour !
+        if start_date and end_date:
+            cursor.execute('UPDATE events SET "startDate" = %s, "endDate" = %s WHERE id = %s', (start_date, end_date, event_id))
+    else:
+        cursor.execute('''
+            INSERT INTO events (name, circuit, "startDate", "endDate", "seasonId") 
+            VALUES (%s, %s, %s, %s, %s) RETURNING id
+        ''', (event_name, circuit, start_date, end_date, season_id))
+        event_id = cursor.fetchone()[0]
     
     # 4. Session
-    cursor.execute('SELECT id FROM sessions WHERE name = %s AND "eventId" = %s', ('Race 1', event_id))
+    cursor.execute('SELECT id FROM sessions WHERE name = %s AND "eventId" = %s', (session_name, event_id))
     res = cursor.fetchone()
-    session_id = res[0] if res else cursor.execute('INSERT INTO sessions (name, type, "eventId") VALUES (%s, %s, %s) RETURNING id', ('Race 1', 'RACE', event_id)) or cursor.fetchone()[0]
+    if res:
+        session_id = res[0]
+        # Idem, on met à jour la date de la session
+        if session_date:
+            cursor.execute('UPDATE sessions SET date = %s WHERE id = %s', (session_date, session_id))
+    else:
+        cursor.execute('''
+            INSERT INTO sessions (name, type, date, "eventId") 
+            VALUES (%s, %s, %s, %s) RETURNING id
+        ''', (session_name, session_type, session_date, event_id))
+        session_id = cursor.fetchone()[0]
     
     conn.commit()
     return session_id
